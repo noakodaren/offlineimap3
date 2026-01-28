@@ -87,9 +87,10 @@ setup(name="offlineimap",
       install_requires=['distro',
                         'imaplib2>=3.5',
                         'rfc6555'],
-      extras_require={'kerberos':'gssapi[kerberos]',
+      extras_require={'cygwin':'portalocker[cygwin]',
+                      'kerberos':'gssapi[kerberos]',
                       'keyring':'keyring[keyring]',
-                      'cygwin':'portalocker[cygwin]',
+                      'pysocks':'pysocks',
                       'testinternet':['certifi~=2020.6.20', 'urllib3~=1.25.9']}
       )
 
