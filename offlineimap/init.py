@@ -432,7 +432,7 @@ class OfflineImap:
             else:
                 errormsg = "Valid accounts are: %s" % (
                     ", ".join(allaccounts))
-                self.ui.error("The account '%s' does not exist" % accountname)
+                self.ui.error(ValueError("The account '%s' does not exist" % accountname))
 
         if len(activeaccounts) < 1:
             errormsg = "No accounts are defined!"
@@ -553,7 +553,7 @@ class OfflineImap:
     def __deletefolder(self, options):
         list_accounts = self._get_activeaccounts(options)
         if len(list_accounts) != 1:
-            self.ui.error("you must supply only one account with '-a'")
+            self.ui.error(ValueError("you must supply only one account with '-a'"))
             return 1
         account = accounts.Account(self.config, list_accounts.pop())
         return account.deletefolder(options.deletefolder)

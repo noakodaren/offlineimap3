@@ -235,8 +235,10 @@ class _Mbnames:
                     for item in json.load(intermediateFD):
                         itemlist.append(item)
             except (OSError, IOError) as e:
-                self.ui.error("could not read intermediate mbnames file '%s':"
-                              "%s" % (intermediateFile, str(e)))
+                self.ui.error(e,
+                              exc_info()[2],
+                              "could not read intermediate mbnames file '%s'" %
+                              (intermediateFile))
             except Exception as e:
                 self.ui.error(
                     e,
