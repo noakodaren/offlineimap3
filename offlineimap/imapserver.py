@@ -258,7 +258,7 @@ class IMAPServer:
                 except Exception as eparams:
                     msg = "%s [cannot display configuration: %s]" % (e, eparams)
 
-                self.ui.error(msg)
+                self.ui.error(e, exc_info()[2], msg)
                 raise
             finally:
                 socket.socket = original_socket

@@ -858,7 +858,9 @@ class IMAPFolder(BaseFolder):
                                    (e, uids, self.name, retry_num))
                         raise OfflineImapError(message,
                                                OfflineImapError.ERROR.MESSAGE)
-                    self.ui.error("%s. While fetching msg %r in folder %r."
+                    self.ui.error(e,
+                                  exc_info()[2],
+                                  "While fetching msg %r in folder %r."
                                   " Query: %s Retrying (%d/%d)" % (
                                       e, uids, self.name, query,
                                       retry_num - fails_left, retry_num))
