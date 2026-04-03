@@ -86,11 +86,11 @@ setup(name="offlineimap",
       license=copyright + ", Licensed under the GPL version 2 or later",
       install_requires=['distro',
                         'imaplib2>=3.5',
-                        'rfc6555',
-                        'urllib3~=1.25.9'],
-      extras_require={'kerberos':'gssapi[kerberos]',
-                      'keyring':'keyring[keyring]',
-                      'cygwin':'portalocker[cygwin]',
-                      'testinternet':'certifi~=2020.6.20'}
+                        'rfc6555'],
+      extras_require={'cygwin':'portalocker[cygwin]',
+                      'kerberos':'gssapi[kerberos]',
+                      'keyring':'keyring',
+                      'pysocks':'pysocks',
+                      'testinternet':['certifi~=2020.6.20', 'urllib3~=1.25.9']}
       )
 
