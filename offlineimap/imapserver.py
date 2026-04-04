@@ -328,13 +328,31 @@ class IMAPServer:
     def __start_tls(self, imapobj):
         if 'STARTTLS' in imapobj.capabilities and not self.usessl:
             self.ui.debug('imap', 'Using STARTTLS connection')
+            # imaplib2.starttls() unconditionally calls _get_capabilities() right
+            # after the TLS handshake (before setting _tls_established=True).
+            # Servers like Protonmail Bridge do not respond to CAPABILITY at
+            # that stage, causing a 60-second hang.  We bypass it by temporarily
+            # substituting a no-op; imaplib2 still sets _tls_established=True
+            # normally, and acquireconnection() already guards its own
+            # post-login CAPABILITY refresh against that flag (see below).
+            _orig_get_cap = imapobj._get_capabilities
+            imapobj._get_capabilities = lambda: None
             try:
                 imapobj.starttls()
             except imapobj.error as e:
-                raise OfflineImapError("Failed to start "
-                                       "TLS connection: %s" % str(e),
-                                       OfflineImapError.ERROR.REPO,
+                # Mark the socket as already closed so acquireconnection()'s
+                # except block does not attempt a redundant second shutdown().
+                imapobj._offlineimap_shutdown_done = True
+                try:
+                    imapobj.shutdown()
+                except Exception:
+                    pass
+                err = "Failed to start TLS connection: %s" % str(e)
+                raise OfflineImapError(err, OfflineImapError.ERROR.REPO,
                                        exc_info()[2])
+            finally:
+                # Always restore the original method, even on success.
+                imapobj._get_capabilities = _orig_get_cap
 
     # All __authn_* procedures are helpers that do authentication.
     # They are class methods that take one parameter, IMAP object.
@@ -605,12 +623,20 @@ class IMAPServer:
             if self.repos.getconfboolean('usecompression', 0):
                 imapobj.enable_compression()
 
-            # update capabilities after login, e.g. gmail serves different ones
-            typ, dat = imapobj.capability()
-            if dat != [None]:
-                # Get the capabilities and convert them to string from bytes
-                s_dat = [x.decode('utf-8') for x in dat[-1].upper().split()]
-                imapobj.capabilities = tuple(s_dat)
+            # update capabilities after login, e.g. gmail serves different ones.
+            # Skip when STARTTLS was used: imaplib2 sets _tls_established=True
+            # inside starttls() (after our _get_capabilities no-op), so this
+            # flag reliably signals that a second CAPABILITY round-trip is both
+            # redundant and dangerous for servers like Protonmail Bridge.
+            # For plain SSL connections _tls_established is False, so Gmail and
+            # similar servers that advertise different post-auth capabilities
+            # still get the normal refresh.
+            if not getattr(imapobj, '_tls_established', False):
+                typ, dat = imapobj.capability()
+                if dat != [None]:
+                    # Get the capabilities and convert them to string from bytes
+                    s_dat = [x.decode('utf-8') for x in dat[-1].upper().split()]
+                    imapobj.capabilities = tuple(s_dat)
 
             if self.delim is None:
                 listres = imapobj.list(self.reference, '""')[1]
@@ -641,6 +667,17 @@ class IMAPServer:
             error..."""
 
             self.semaphore.release()
+
+            # Close the socket only when __start_tls has not already done so
+            # (it sets _offlineimap_shutdown_done=True before calling shutdown).
+            # A second shutdown() on the same socket raises [Errno 9] Bad file
+            # descriptor and generates spurious warnings in the cleanup chain.
+            if imapobj is not None and not getattr(
+                    imapobj, '_offlineimap_shutdown_done', False):
+                try:
+                    imapobj.shutdown()
+                except Exception:
+                    pass
 
             severity = OfflineImapError.ERROR.REPO
             if type(e) == gaierror:
