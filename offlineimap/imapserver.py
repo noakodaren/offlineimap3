@@ -340,13 +340,6 @@ class IMAPServer:
             try:
                 imapobj.starttls()
             except imapobj.error as e:
-                # Mark the socket as already closed so acquireconnection()'s
-                # except block does not attempt a redundant second shutdown().
-                imapobj._offlineimap_shutdown_done = True
-                try:
-                    imapobj.shutdown()
-                except Exception:
-                    pass
                 err = "Failed to start TLS connection: %s" % str(e)
                 raise OfflineImapError(err, OfflineImapError.ERROR.REPO,
                                        exc_info()[2])
@@ -667,17 +660,6 @@ class IMAPServer:
             error..."""
 
             self.semaphore.release()
-
-            # Close the socket only when __start_tls has not already done so
-            # (it sets _offlineimap_shutdown_done=True before calling shutdown).
-            # A second shutdown() on the same socket raises [Errno 9] Bad file
-            # descriptor and generates spurious warnings in the cleanup chain.
-            if imapobj is not None and not getattr(
-                    imapobj, '_offlineimap_shutdown_done', False):
-                try:
-                    imapobj.shutdown()
-                except Exception:
-                    pass
 
             severity = OfflineImapError.ERROR.REPO
             if type(e) == gaierror:
