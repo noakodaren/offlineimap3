@@ -657,8 +657,30 @@ def syncfolder(account, remotefolder, quick):
         else:
             localfolder.cachemessagelist()
             if quick:
-                if (not localfolder.quickchanged(statusfolder) and
-                        not remotefolder.quickchanged(statusfolder)):
+                """Quick sync check: if neither the local nor the remote folder
+                has changed since the last sync, skip syncing this folder.
+                This is a quick check that can save a lot of time for folders
+                that don't change often, but it can only be used if we have
+                a full list of UIDs for the remote folder, so it can't be used
+                together with maxage or startdate. The quick check is based on
+                the "quickchanged" function of the repositories, which can use
+                different heuristics to determine if the folder has changed
+                since the last sync.
+
+                If the quick check fails (e.g. because the
+                repository doesn't support it, or because of an error),
+                we assume that the folder has changed and we do a full sync,
+                to avoid missing any changes."""
+                try:
+                    remote_quick_unchanged = not remotefolder.quickchanged(statusfolder)
+                except OfflineImapError as e:
+                    getglobalui().warn(
+                        "Could not check quickchanged for remote folder '%s': %s"
+                        " — assuming changed, forcing full sync." % (remotefolder.name, e)
+                    )
+                    remote_quick_unchanged = False  # Assume changed if we can't check.
+
+                if (not localfolder.quickchanged(statusfolder) and remote_quick_unchanged):
                     ui.skippingfolder(remotefolder)
                     localrepos.restore_atime()
                     return
