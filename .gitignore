@@ -18,3 +18,5 @@ offlineimapui.7
 tags
 # Generated conf files for Travis-CI tests.
 oli-travis.conf
+# PyPI files
+/dist

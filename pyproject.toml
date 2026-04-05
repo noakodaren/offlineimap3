@@ -5,7 +5,7 @@ dependencies = [
     "rfc6555"
 ]
 name = "offlineimap"
-version = "8.0.1"
+version = "8.0.2"
 description = "IMAP synchronization tool"
 authors = [
     { name = "John Goerzen & contributors", email = "jgoerzen@complete.org" }
@@ -44,6 +44,7 @@ requires = [
     "setuptools>=18.5",
     "wheel"
 ]
+build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
 cygwin = ["portalocker[cygwin]"]
@@ -54,3 +55,7 @@ testinternet = ["certifi~=2020.6.20", "urllib3~=1.25.9"]
 
 [project.scripts]
 offlineimap = "offlineimap.init:main"
+
+[tool.setuptools.packages.find]
+include = ["offlineimap*"]
+exclude = ["contrib*", "test*", "docs*"]
