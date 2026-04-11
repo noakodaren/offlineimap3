@@ -15,6 +15,55 @@ Note to mainainers:
 * The following excerpt is only usefull when rendered in the website.
 {:toc}
 
+### OfflineIMAP v8.0.2 (2026-04-11)
+
+**Notes**
+
+This release focuses on connection reliability, crash prevention, and packaging improvements. Several long-standing issues with STARTTLS hangs, stale pooled connections, and incorrect `ui.error` calls have been fixed. The build system has been modernized (setup.py removed; pyproject.toml is now authoritative) and Fedora 44 SSL certificate paths are supported.
+
+#### Bug Fixes
+
+- **Fix imaplib2 hangs on STARTTLS**: Servers like Protonmail Bridge that do not respond to CAPABILITY immediately after TLS handshake caused 60-second hangs. Bypass the redundant capability query during STARTTLS and skip the post-login CAPABILITY refresh when STARTTLS was used. (Fixes the STARTTLS reliability issue reported in #222) [kix]
+
+- **Do not shutdown the socket in start_tls**: Restore the original `_get_capabilities` method in a `finally` block so the connection is not left in a broken state after STARTTLS errors. [kix]
+
+- **Check socket health before returning pooled connections**: Stale or dead pooled IMAP connections now go through a `select()`-based socket check and a NOOP health probe before being handed out. Dead connections are transparently replaced. [kix]
+
+- **Fix `'str' object has no attribute '__suppress_context__'` crash**: All `ui.error()` call sites now pass a proper exception object as the first argument instead of a plain string, preventing an `AttributeError` on Python 3.13. (Fixes #233) [serge-sans-paille]
+
+- **Graceful handling of remote folder retrieval errors**: If retrieving the remote folder list fails, the account is skipped instead of crashing the entire sync run. [kix]
+
+- **Robust quick-sync remote folder check**: If `remotefolder.quickchanged()` raises an error, the folder is now assumed changed and a full sync is performed instead of crashing. [kix]
+
+- **Abort remaining auth methods on dead socket**: When an authentication method fails and the underlying socket is dead, the remaining methods are skipped immediately instead of producing additional confusing socket errors. [kix]
+
+#### Changes
+
+- **Fedora 44 SSL CA certificate path**: Added the new `/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem` path for Fedora 44+, while keeping the old path for Fedora ≤ 43. (Fixes #237) [Franklin Bynum]
+
+- **Fix Sphinx intersphinx_mapping syntax** in `docs/doc-src/conf.py`. [Volker Eckert]
+
+- **Move `urllib3` from core dependencies to `testinternet` optional group**: `urllib3` is only needed for the test/contrib internet helper, not at runtime. [Stephen Huan]
+
+- **Add PySocks as an optional dependency** for proxy support. [Stephen Huan]
+
+- **Fix `keyring[keyring]` dependency** to `keyring` for consistency. [Stephen Huan]
+
+- **Remove deprecated classifiers and adopt PEP 639 license format**: License field now uses SPDX expression `GPL-2.0-or-later`; deprecated GPLv2-only classifier removed. [Stephen Huan]
+
+- **Remove `setup.py`**: The project now uses `pyproject.toml` exclusively for build configuration. [kix]
+
+- **Version bump to 8.0.2** and `.gitignore` updated for PyPI build artifacts. [kix]
+
+#### Authors
+
+- Rodolfo García Peñas (kix) (17)
+- Stephen Huan (4)
+- Franklin Bynum (1)
+- Volker Eckert (1)
+- serge-sans-paille (1)
+
+
 ### OfflineIMAP v8.0.1 (2025-10-28)
 
 **Notes**
