@@ -927,15 +927,33 @@ class IMAPFolder(BaseFolder):
             try:
                 # See if the defects after fixes are preventing us from obtaining bytes
                 _ = ndata1.as_bytes(policy=self.policy['8bit-RFC'])
-            except UnicodeEncodeError as err:
-                # Unknown issue which is causing failure of as_bytes()
-                msg_id = self.getmessageheader(ndata1, "message-id")
-                if msg_id is None:
-                    msg_id = '<Unknown Message-ID>'
-                raise OfflineImapError(
-                        "UID {} ({}) has defects preventing it from being processed!\n  {}: {}".format(
-                            uids, msg_id, type(err).__name__, err),
-                        OfflineImapError.ERROR.MESSAGE)
+            except UnicodeEncodeError:
+                # Apply utf-8 charset to parts that fail to encode with their current charset
+                # This usually happens when malformed bytes were replaced with \ufffd during parsing
+                # The email.policy.default also replaces unencodable characters with \ufffd
+                # so we need to set the charset to utf-8 to avoid this and instead let the user
+                # know that the message has defects.
+                self.ui.warn(" ... applying charset fix for unencodable characters (\\ufffd).")
+                for part in ndata1.walk():
+                    payload = part.get_payload()
+                    if isinstance(payload, str):
+                        charset = part.get_content_charset() or 'us-ascii'
+                        try:
+                            payload.encode(charset, 'surrogateescape')
+                        except UnicodeEncodeError:
+                            part.set_charset('utf-8')
+                try:
+                    # Retry obtaining bytes after charset fixes
+                    _ = ndata1.as_bytes(policy=self.policy['8bit-RFC'])
+                except UnicodeEncodeError as err:
+                    # Unknown issue which is causing failure of as_bytes()
+                    msg_id = self.getmessageheader(ndata1, "message-id")
+                    if msg_id is None:
+                        msg_id = '<Unknown Message-ID>'
+                    raise OfflineImapError(
+                            "UID {} ({}) has defects preventing it from being processed!\n  {}: {}".format(
+                                uids, msg_id, type(err).__name__, err),
+                            OfflineImapError.ERROR.MESSAGE)
         ndata = [ndata0, ndata1]
 
         return ndata
