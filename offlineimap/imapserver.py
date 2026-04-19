@@ -382,6 +382,12 @@ class IMAPServer:
             finally:
                 # Always restore the original method, even on success.
                 imapobj._get_capabilities = _orig_get_cap
+        elif self.starttls and not self.usessl:
+            raise OfflineImapError(
+                "STARTTLS requested but server does not advertise STARTTLS capability. "
+                "Aborting to prevent sending password in plaintext (possible MITM attack). "
+                "If you REALLY want an insecure connection, set 'starttls = no'.",
+                OfflineImapError.ERROR.REPO)
 
     # All __authn_* procedures are helpers that do authentication.
     # They are class methods that take one parameter, IMAP object.
