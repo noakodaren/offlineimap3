@@ -41,10 +41,6 @@ except ImportError:
     have_gss = False
 
 
-class AuthMethodSocketDeadError(Exception):
-    pass
-
-
 def _is_socket_alive(imapobj):
     """Returns True if the underlying socket connection is still usable.
 
@@ -481,7 +477,7 @@ class IMAPServer:
 
         # GSSAPI is tried first by default: we will probably go TLS after it and
         # GSSAPI mustn't be tunneled over TLS.
-        for m in list(self.authmechs):
+        for m in self.authmechs:
             if m not in auth_methods:
                 raise Exception("Bad authentication method %s, "
                                 "please, file OfflineIMAP bug" % m)
@@ -514,11 +510,9 @@ class IMAPServer:
                 # error. Instead, bail out immediately and let
                 # acquireconnection() handle the error and cleanup.
                 if not _is_socket_alive(imapobj):
-                    msg = f"Socket dead after {m} failure. Reconnecting to try remaining auth methods."
+                    msg = f"Socket dead after {m} failure, aborting remaining auth methods"
                     self.ui.debug('imap', msg)
-                    if m in self.authmechs:
-                        self.authmechs.remove(m)
-                    raise AuthMethodSocketDeadError(msg)
+                    break
 
         if len(exc_stack):
             msg = "\n\t".join([": ".join((x[0], str(x[1]))) for x in exc_stack])
@@ -683,16 +677,6 @@ class IMAPServer:
                         self.__authn_helper(imapobj)
                         self.goodpassword = self.password
                         success = True
-                    except AuthMethodSocketDeadError:
-                        # Reconnect and try remaining auth mechanisms
-                        if imapobj is not None and not getattr(
-                                imapobj, '_offlineimap_shutdown_done', False):
-                            try:
-                                imapobj.shutdown()
-                            except Exception:
-                                pass
-                        self.ui.debug('imap', 'Reconnecting to try other auth methods')
-                        continue
                     except OfflineImapError as e:
                         self.passworderror = str(e)
                         raise
