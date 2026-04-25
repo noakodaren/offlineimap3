@@ -158,6 +158,7 @@ class IMAPServer:
         self.lastowner = {}
         self.semaphore = BoundedSemaphore(self.maxconnections)
         self.connectionlock = Lock()
+        self.closing = False
         self.reference = repos.getreference()
         self.idlefolders = repos.getidlefolders()
         self.gss_vc = None
@@ -575,6 +576,11 @@ class IMAPServer:
 
         self.semaphore.acquire()
         self.connectionlock.acquire()
+        if self.closing:
+            self.connectionlock.release()
+            self.semaphore.release()
+            raise OfflineImapError("Server is closing",
+                                   OfflineImapError.ERROR.REPO)
         curThread = current_thread()
         imapobj = None
 
@@ -813,14 +819,17 @@ class IMAPServer:
         self.semaphore.release()
 
     def close(self):
+        # First make sure no new connections can be established.
+        self.connectionlock.acquire()
+        self.closing = True
+        self.connectionlock.release()
+
         # Make sure I own all the semaphores.  Let the threads finish
         # their stuff.  This is a blocking method.
+        # Make sure to not call this under connectionlock to avoid deadlocks.
+        threadutil.semaphorereset(self.semaphore, self.maxconnections)
+
         with self.connectionlock:
-            # first, wait till all connections had been released.
-            # TODO: won't work IMHO, as releaseconnection() also
-            # requires the connectionlock, leading to a potential
-            # deadlock! Audit & check!
-            threadutil.semaphorereset(self.semaphore, self.maxconnections)
             for imapobj in self.assignedconnections + self.availableconnections:
                 imapobj.logout()
             self.assignedconnections = []
@@ -829,6 +838,7 @@ class IMAPServer:
             # reset GSSAPI state
             self.gss_vc = None
             self.gssapi = False
+            self.closing = False
 
     def keepalive(self, timeout, event):
         """Sends a NOOP to each connection recorded.
